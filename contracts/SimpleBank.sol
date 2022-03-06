@@ -4,14 +4,14 @@
  * https://solidity.readthedocs.io/en/latest/080-breaking-changes.html
  */
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.16 <0.9.0;
+pragma solidity ^0.8.0;
 
 contract SimpleBank {
 
     /* State variables
      */
     
-    bool private lockBalances;
+    
     // Fill in the visibility keyword. 
     // Hint: We want to protect our users balance from other contracts
     mapping(address => uint) private balances;
@@ -46,10 +46,11 @@ contract SimpleBank {
     // Typically, called when invalid data is sent
     // Added so ether sent to this contract is reverted if the contract fails
     // otherwise, the sender's money is transferred to contract
-    function() external payable {
-      
+    fallback() external payable {
+      revert();
     }
-
+    receive() external payable {}
+    
     /// @notice Get balance
     /// @return The balance of the user
     function getBalance() public view returns (uint) {
@@ -76,16 +77,12 @@ contract SimpleBank {
     /// @return The balance of the user after the deposit is made
     function deposit() payable public returns(uint) {
       // 2. Users should be enrolled before they can make deposits
-      require(enrolled[msg.sender] == true && !lockBalances);
+      require(enrolled[msg.sender] == true);
       // 3. Add the amount to the user's balance. Hint: the amount can be
       //    accessed from of the global variable `msg`
       address user = msg.sender;
 
-      lockBalances = true;
-
       balances[msg.sender] += msg.value;
-
-      lockBalances = false;
 
       // 4. Emit the appropriate event associated with this function
       emit LogDepositMade(user, msg.value);
@@ -106,23 +103,17 @@ contract SimpleBank {
       // 2. Transfer Eth to the sender and decrement the withdrawal amount from
       //    sender's balance
       // 3. Emit the appropriate event for this message
-      address payable user = msg.sender;
-      require(!lockBalances && balances[user] >= withdrawAmount && withdrawAmount > 0);
+      address user = msg.sender;
+      require(balances[user] >= withdrawAmount, "insufficient funds");
       
-      lockBalances = true;
+      balances[user] -= withdrawAmount;
+      payable(user).transfer(withdrawAmount);
 
-      //user.transfer(withdrawAmount);
-      (bool success, ) = user.call.value(withdrawAmount)("");
-
-      if(success) {
-        balances[user] -= withdrawAmount;
-      }
-
-      lockBalances = false;
 
       emit LogWithdrawal(user, withdrawAmount, balances[user]);
 
       return balances[user];
+  
 
     }
 }
